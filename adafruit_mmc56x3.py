@@ -33,6 +33,12 @@ from adafruit_bus_device import i2c_device
 from adafruit_register.i2c_struct import ROUnaryStruct, UnaryStruct
 from adafruit_register.i2c_bit import RWBit
 
+try:
+    from typing import Tuple
+    from busio import I2C
+except ImportError:
+    pass
+
 __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_MMC56x3.git"
 
@@ -76,7 +82,7 @@ class MMC5603:
         mag_x, mag_y, mag_z = sensor.magnetic
 
     :param ~busio.I2C i2c_bus: The I2C bus the MMC5603 is connected to.
-    :param address: The I2C device address. Defaults to :const:`0x30`
+    :param int address: The I2C device address. Defaults to :const:`0x30`
     """
 
     _chip_id = ROUnaryStruct(_MMC5603_PRODUCT_ID, "<B")
@@ -91,7 +97,7 @@ class MMC5603:
     _meas_m_done = RWBit(_MMC5603_STATUS_REG, 6)
     _meas_t_done = RWBit(_MMC5603_STATUS_REG, 7)
 
-    def __init__(self, i2c_bus, address=_MMC5603_I2CADDR_DEFAULT):
+    def __init__(self, i2c_bus: I2C, address: int = _MMC5603_I2CADDR_DEFAULT) -> None:
         # pylint: disable=no-member
         self.i2c_device = i2c_device.I2CDevice(i2c_bus, address)
         if self._chip_id != _MMC5603_CHIP_ID:
@@ -101,7 +107,7 @@ class MMC5603:
         self._buffer = bytearray(9)
         # self.performance_mode = PerformanceMode.MODE_ULTRA
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset the sensor to the default state set by the library"""
         self._ctrl1_reg = 0x80  # write only, set topmost bit
         time.sleep(0.020)
@@ -110,7 +116,7 @@ class MMC5603:
         self.set_reset()
 
     @property
-    def temperature(self):
+    def temperature(self) -> float:
         """The processed temperature sensor value, returned in floating point C"""
         if self.continuous_mode:
             raise RuntimeError("Can only read temperature when not in continuous mode")
@@ -123,7 +129,7 @@ class MMC5603:
         return temp
 
     @property
-    def magnetic(self):
+    def magnetic(self) -> Tuple[float, float, float]:
         """The processed magnetometer sensor values.
         A 3-tuple of X, Y, Z axis values in microteslas that are signed floats.
         """
@@ -149,13 +155,13 @@ class MMC5603:
         return (x, y, z)
 
     @property
-    def data_rate(self):
+    def data_rate(self) -> int:
         """Output data rate, 0 for on-request data.
         1-255 or 1000 for freq of continuous-mode readings"""
         return self._odr_cache
 
     @data_rate.setter
-    def data_rate(self, value):
+    def data_rate(self, value: int) -> None:
         if not ((value == 1000) or (0 <= value <= 255)):
             raise ValueError("Data rate must be 0-255 or 1000 Hz")
         self._odr_cache = value
@@ -169,14 +175,14 @@ class MMC5603:
             self._ctrl2_reg = self._ctrl2_cache
 
     @property
-    def continuous_mode(self):
+    def continuous_mode(self) -> bool:
         """Whether or not to put the chip in continous mode - be sure
         to set the data_rate as well!
         """
         return self._ctrl2_cache & 0x10
 
     @continuous_mode.setter
-    def continuous_mode(self, value):
+    def continuous_mode(self, value: bool) -> None:
         if value:
             self._ctrl0_reg = 0x80  # turn on cmm_freq_en bit
             self._ctrl2_cache |= 0x10  # turn on cmm_en bit
@@ -184,7 +190,7 @@ class MMC5603:
             self._ctrl2_cache &= ~0x10  # turn off cmm_en bit
         self._ctrl2_reg = self._ctrl2_cache
 
-    def set_reset(self):
+    def set_reset(self) -> None:
         """Pulse large currents through the sense coils to clear any offset"""
         self._ctrl0_reg = 0x08  # turn on set bit
         time.sleep(0.001)  # 1 ms
