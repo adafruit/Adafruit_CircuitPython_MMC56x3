@@ -51,21 +51,32 @@ _MMC5603_CTRL_REG2 = const(0x1D)  # Register address for control 2
 
 class MMC5603:
     """Driver for the MMC5603 3-axis magnetometer.
+
+    **Quickstart: Importing and using the device**
+
+    Here is an example of using the :py:class:`MMC5603` class.
+    First you will need to import the libraries to use the sensor
+
+    .. code-block:: python
+
+        import board
+        import adafruit_mmc56x3
+
+    Once this is done you can define your `board.I2C` object and define your sensor object
+
+    .. code-block:: python
+
+        i2c = board.I2C()
+        sensor = adafruit_mmc56x3.MMC5603(i2c)
+
+    Now you have access to the :attr:`magnetic` attribute
+
+    .. code-block:: python
+
+        mag_x, mag_y, mag_z = sensor.magnetic
+
     :param ~busio.I2C i2c_bus: The I2C bus the MMC5603 is connected to.
     :param address: The I2C device address. Defaults to :const:`0x30`
-    **Quickstart: Importing and using the device**
-        Here is an example of using the :class:`MMC5603` class.
-        First you will need to import the libraries to use the sensor
-        .. code-block:: python
-            import board
-            import adafruit_mmc56x3
-        Once this is done you can define your `board.I2C` object and define your sensor object
-        .. code-block:: python
-            i2c = board.I2C()
-            sensor = adafruit_mmc56x3.MMC5603(i2c)
-        Now you have access to the :attr:`magnetic` attribute
-        .. code-block:: python
-            mag_x, mag_y, mag_z = sensor.magnetic
     """
 
     _chip_id = ROUnaryStruct(_MMC5603_PRODUCT_ID, "<B")
