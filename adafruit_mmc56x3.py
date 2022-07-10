@@ -43,6 +43,7 @@ _MMC5603_OUT_X_L = const(0x00)  # Register that starts the mag data out
 _MMC5603_OUT_TEMP = const(0x09)  # Register that contains temp reading
 _MMC5603_PRODUCT_ID = const(0x39)  # Register that contains the part ID
 _MMC5603_STATUS_REG = const(0x18)  # Register address for device status
+_MMC5603_ODR_REG = const(0x1A)  # Output data rate register
 _MMC5603_CTRL_REG0 = const(0x1B)  # Register address for control 0
 _MMC5603_CTRL_REG1 = const(0x1C)  # Register address for control 1
 _MMC5603_CTRL_REG2 = const(0x1D)  # Register address for control 2
@@ -69,20 +70,15 @@ class MMC5603:
     _chip_id = ROUnaryStruct(_MMC5603_PRODUCT_ID, "<B")
     _ctrl0_reg = UnaryStruct(_MMC5603_CTRL_REG0, "<B")
     _ctrl1_reg = UnaryStruct(_MMC5603_CTRL_REG1, "<B")
+    _ctrl2_reg = UnaryStruct(_MMC5603_CTRL_REG2, "<B")
     _status_reg = ROUnaryStruct(_MMC5603_STATUS_REG, "<B")
+    _odr_reg = UnaryStruct(_MMC5603_ODR_REG, "<B")
+    _raw_temp_data = ROUnaryStruct(_MMC5603_OUT_TEMP, "<B")
 
     _reset = RWBit(_MMC5603_CTRL_REG1, 7)
     _meas_m_done = RWBit(_MMC5603_STATUS_REG, 6)
     _meas_t_done = RWBit(_MMC5603_STATUS_REG, 7)
 
-    _raw_temp_data = ROUnaryStruct(_MMC5603_OUT_TEMP, "<B")
-
-    """
-    _perf_mode = RWBits(2, _LIS3MDL_CTRL_REG1, 5)
-    _z_perf_mode = RWBits(2, _LIS3MDL_CTRL_REG4, 2)
-    _operation_mode = RWBits(2, _LIS3MDL_CTRL_REG3, 0)
-    _data_rate = RWBits(4, _LIS3MDL_CTRL_REG1, 1)
-    """
 
     def __init__(self, i2c_bus, address=_MMC5603_I2CADDR_DEFAULT):
         # pylint: disable=no-member
@@ -94,22 +90,22 @@ class MMC5603:
         self._buffer = bytearray(9)
         #self.performance_mode = PerformanceMode.MODE_ULTRA
 
-        #self.data_rate = Rate.RATE_155_HZ
-        #self.range = Range.RANGE_4_GAUSS
-        #self.operation_mode = OperationMode.CONTINUOUS
-
-
 
     def reset(self):  # pylint: disable=no-self-use
         """Reset the sensor to the default state set by the library"""
         self._ctrl1_reg = 0x80  # write only, set topmost bit
         time.sleep(0.020)
+        self._odr_cache = 0
+        self._ctrl2_cache = 0
+        self.set_reset()
 
     @property
     def temperature(self):
         """The processed temperature sensor value, returned in floating point C
         """
-        self._ctrl0_reg = 0x02  # TM_T + Auto_SR_en
+        if self.continuous_mode:
+            raise RuntimeError("Can only read temperature when not in continuous mode")
+        self._ctrl0_reg = 0x02  # TM_T
         while not self._meas_t_done:
             time.sleep(0.005)
         t = self._raw_temp_data
@@ -117,15 +113,16 @@ class MMC5603:
         t -= 75   # 0 value is -75
         return t
 
-
     @property
     def magnetic(self):
         """The processed magnetometer sensor values.
         A 3-tuple of X, Y, Z axis values in microteslas that are signed floats.
         """
-        self._ctrl0_reg = 0x21  # TM_M + Auto_SR_en
-        while not self._meas_m_done:
-            time.sleep(0.005)
+        if not self.continuous_mode:
+            self._ctrl0_reg = 0x01   # TM_M
+
+            while not self._meas_m_done:
+                time.sleep(0.005)
         self._buffer[0] = _MMC5603_OUT_X_L
         with self.i2c_device as i2c:
             i2c.write_then_readinto(self._buffer, self._buffer,
@@ -143,51 +140,47 @@ class MMC5603:
         z *= 0.00625
         return (x, y, z)
 
+
     @property
     def data_rate(self):
-        """The rate at which the sensor takes measurements. Must be a ``Rate``"""
-        return self._data_rate
+        """Output data rate, 0 for on-request data. 1-255 or 1000 for freq of continuous-mode readings"""
+        return self._odr_cache
 
     @data_rate.setter
     def data_rate(self, value):
-        # pylint: disable=no-member
-        if value is Rate.RATE_155_HZ:
-            self.performance_mode = PerformanceMode.MODE_ULTRA
-        if value is Rate.RATE_300_HZ:
-            self.performance_mode = PerformanceMode.MODE_HIGH
-        if value is Rate.RATE_560_HZ:
-            self.performance_mode = PerformanceMode.MODE_MEDIUM
-        if value is Rate.RATE_1000_HZ:
-            self.performance_mode = PerformanceMode.MODE_LOW_POWER
-        sleep(0.010)
-        if not Rate.is_valid(value):
-            raise AttributeError("`data_rate` must be a `Rate`")
-        self._data_rate = value
+        if not ((value == 1000) or (0 <= value <= 255)):
+            raise ValueError("Data rate must be 0-255 or 1000 Hz")
+        self._odr_cache = value
+        if value == 1000:
+            self._odr_reg = 255
+            self._ctrl2_cache |= 0x80 # turn on hpower bit
+            self._ctrl2_reg = self._ctrl2_cache
+        else:
+            self._odr_reg = value
+            self._ctrl2_cache &= ~0x80 # turn off hpower bit
+            self._ctrl2_reg = self._ctrl2_cache
+
 
     @property
-    def performance_mode(self):
-        """Sets the 'performance mode' of the sensor. Must be a ``PerformanceMode``.
-        Note that `performance_mode` affects the available data rate and will be
-        automatically changed by setting ``data_rate`` to certain values."""
-
-        return self._perf_mode
-
-    @performance_mode.setter
-    def performance_mode(self, value):
-        if not PerformanceMode.is_valid(value):
-            raise AttributeError("`performance_mode` must be a `PerformanceMode`")
-        self._perf_mode = value
-        self._z_perf_mode = value
-
-    @property
-    def operation_mode(self):
-        """The operating mode for the sensor, controlling how measurements are taken.
-        Must be an `OperationMode`. See the the `OperationMode` document for additional details
+    def continuous_mode(self):
+        """Whether or not to put the chip in continous mode - be sure
+        to set the data_rate as well!
         """
-        return self._operation_mode
+        return self._ctrl2_cache & 0x10
 
-    @operation_mode.setter
-    def operation_mode(self, value):
-        if not OperationMode.is_valid(value):
-            raise AttributeError("operation mode must be a OperationMode")
-        self._operation_mode = value
+    @continuous_mode.setter
+    def continuous_mode(self, value):
+        if value:
+            self._ctrl0_reg = 0x80 # turn on cmm_freq_en bit
+            self._ctrl2_cache |= 0x10 # turn on cmm_en bit
+        else:
+            self._ctrl2_cache &= ~0x10 # turn off cmm_en bit
+        self._ctrl2_reg = self._ctrl2_cache
+
+
+    def set_reset(self):
+        """Pulse large currents through the sense coils to clear any offset"""
+        self._ctrl0_reg = 0x08 # turn on set bit
+        time.sleep(0.001) # 1 ms
+        self._ctrl0_reg = 0x10 # turn on reset bit
+        time.sleep(0.001) # 1 ms
