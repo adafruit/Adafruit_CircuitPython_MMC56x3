@@ -17,7 +17,7 @@ Implementation Notes
 
 **Hardware:**
 
-* `Adafruit MMC5603 Magnetometer <https://www.adafruit.com/product/5579>`
+* `Adafruit MMC5603 Magnetometer <https://www.adafruit.com/product/5579>`_
 
 **Software and Dependencies:**
 
