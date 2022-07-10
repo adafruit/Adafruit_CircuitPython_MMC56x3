@@ -29,8 +29,7 @@ Implementation Notes
 import time
 from micropython import const
 from adafruit_bus_device import i2c_device
-from adafruit_register.i2c_struct import ROUnaryStruct, UnaryStruct, Struct
-from adafruit_register.i2c_bits import RWBits
+from adafruit_register.i2c_struct import ROUnaryStruct, UnaryStruct
 from adafruit_register.i2c_bit import RWBit
 
 __version__ = "0.0.0-auto.0"
@@ -47,6 +46,7 @@ _MMC5603_ODR_REG = const(0x1A)  # Output data rate register
 _MMC5603_CTRL_REG0 = const(0x1B)  # Register address for control 0
 _MMC5603_CTRL_REG1 = const(0x1C)  # Register address for control 1
 _MMC5603_CTRL_REG2 = const(0x1D)  # Register address for control 2
+
 
 class MMC5603:
     """Driver for the MMC5603 3-axis magnetometer.
@@ -79,7 +79,6 @@ class MMC5603:
     _meas_m_done = RWBit(_MMC5603_STATUS_REG, 6)
     _meas_t_done = RWBit(_MMC5603_STATUS_REG, 7)
 
-
     def __init__(self, i2c_bus, address=_MMC5603_I2CADDR_DEFAULT):
         # pylint: disable=no-member
         self.i2c_device = i2c_device.I2CDevice(i2c_bus, address)
@@ -88,10 +87,9 @@ class MMC5603:
 
         self.reset()
         self._buffer = bytearray(9)
-        #self.performance_mode = PerformanceMode.MODE_ULTRA
+        # self.performance_mode = PerformanceMode.MODE_ULTRA
 
-
-    def reset(self):  # pylint: disable=no-self-use
+    def reset(self):
         """Reset the sensor to the default state set by the library"""
         self._ctrl1_reg = 0x80  # write only, set topmost bit
         time.sleep(0.020)
@@ -101,17 +99,16 @@ class MMC5603:
 
     @property
     def temperature(self):
-        """The processed temperature sensor value, returned in floating point C
-        """
+        """The processed temperature sensor value, returned in floating point C"""
         if self.continuous_mode:
             raise RuntimeError("Can only read temperature when not in continuous mode")
         self._ctrl0_reg = 0x02  # TM_T
         while not self._meas_t_done:
             time.sleep(0.005)
-        t = self._raw_temp_data
-        t *= 0.8  # 0.8*C / LSB
-        t -= 75   # 0 value is -75
-        return t
+        temp = self._raw_temp_data
+        temp *= 0.8  # 0.8*C / LSB
+        temp -= 75  # 0 value is -75
+        return temp
 
     @property
     def magnetic(self):
@@ -119,31 +116,30 @@ class MMC5603:
         A 3-tuple of X, Y, Z axis values in microteslas that are signed floats.
         """
         if not self.continuous_mode:
-            self._ctrl0_reg = 0x01   # TM_M
+            self._ctrl0_reg = 0x01  # TM_M
 
             while not self._meas_m_done:
                 time.sleep(0.005)
         self._buffer[0] = _MMC5603_OUT_X_L
         with self.i2c_device as i2c:
-            i2c.write_then_readinto(self._buffer, self._buffer,
-                                    out_end=1)
-        x = (self._buffer[0] << 12 | self._buffer[1] << 4 | self._buffer[6] >> 4)
-        y = (self._buffer[2] << 12 | self._buffer[3] << 4 | self._buffer[7] >> 4)
-        z = (self._buffer[4] << 12 | self._buffer[5] << 4 | self._buffer[8] >> 4)
+            i2c.write_then_readinto(self._buffer, self._buffer, out_end=1)
+        x = self._buffer[0] << 12 | self._buffer[1] << 4 | self._buffer[6] >> 4
+        y = self._buffer[2] << 12 | self._buffer[3] << 4 | self._buffer[7] >> 4
+        z = self._buffer[4] << 12 | self._buffer[5] << 4 | self._buffer[8] >> 4
         # fix center offsets
-        x -=  1<<19
-        y -=  1<<19
-        z -=  1<<19
+        x -= 1 << 19
+        y -= 1 << 19
+        z -= 1 << 19
         # scale to uT by LSB in datasheet
         x *= 0.00625
         y *= 0.00625
         z *= 0.00625
         return (x, y, z)
 
-
     @property
     def data_rate(self):
-        """Output data rate, 0 for on-request data. 1-255 or 1000 for freq of continuous-mode readings"""
+        """Output data rate, 0 for on-request data.
+        1-255 or 1000 for freq of continuous-mode readings"""
         return self._odr_cache
 
     @data_rate.setter
@@ -153,13 +149,12 @@ class MMC5603:
         self._odr_cache = value
         if value == 1000:
             self._odr_reg = 255
-            self._ctrl2_cache |= 0x80 # turn on hpower bit
+            self._ctrl2_cache |= 0x80  # turn on hpower bit
             self._ctrl2_reg = self._ctrl2_cache
         else:
             self._odr_reg = value
-            self._ctrl2_cache &= ~0x80 # turn off hpower bit
+            self._ctrl2_cache &= ~0x80  # turn off hpower bit
             self._ctrl2_reg = self._ctrl2_cache
-
 
     @property
     def continuous_mode(self):
@@ -171,16 +166,15 @@ class MMC5603:
     @continuous_mode.setter
     def continuous_mode(self, value):
         if value:
-            self._ctrl0_reg = 0x80 # turn on cmm_freq_en bit
-            self._ctrl2_cache |= 0x10 # turn on cmm_en bit
+            self._ctrl0_reg = 0x80  # turn on cmm_freq_en bit
+            self._ctrl2_cache |= 0x10  # turn on cmm_en bit
         else:
-            self._ctrl2_cache &= ~0x10 # turn off cmm_en bit
+            self._ctrl2_cache &= ~0x10  # turn off cmm_en bit
         self._ctrl2_reg = self._ctrl2_cache
-
 
     def set_reset(self):
         """Pulse large currents through the sense coils to clear any offset"""
-        self._ctrl0_reg = 0x08 # turn on set bit
-        time.sleep(0.001) # 1 ms
-        self._ctrl0_reg = 0x10 # turn on reset bit
-        time.sleep(0.001) # 1 ms
+        self._ctrl0_reg = 0x08  # turn on set bit
+        time.sleep(0.001)  # 1 ms
+        self._ctrl0_reg = 0x10  # turn on reset bit
+        time.sleep(0.001)  # 1 ms
