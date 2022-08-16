@@ -39,7 +39,7 @@ try:
 except ImportError:
     pass
 
-__version__ = "0.0.0-auto.0"
+__version__ = "0.0.0+auto.0"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_MMC56x3.git"
 
 _MMC5603_I2CADDR_DEFAULT: int = const(0x30)  # Default I2C address
