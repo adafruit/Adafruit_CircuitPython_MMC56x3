@@ -84,7 +84,7 @@ following command to install:
 
 .. code-block:: shell
 
-    circup install mmc56x3
+    circup install adafruit_mmc56x3
 
 Or the following command to update an existing version:
 
