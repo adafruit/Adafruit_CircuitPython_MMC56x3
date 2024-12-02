@@ -1,10 +1,12 @@
 # SPDX-FileCopyrightText: 2021 ladyada for Adafruit Industries
 # SPDX-License-Identifier: MIT
 
-""" Display magnetometer data once per second """
+"""Display magnetometer data once per second"""
 
 import time
+
 import board
+
 import adafruit_mmc56x3
 
 i2c = board.I2C()  # uses board.SCL and board.SDA
@@ -15,10 +17,6 @@ while True:
     mag_x, mag_y, mag_z = sensor.magnetic
     temp = sensor.temperature
 
-    print(
-        "X:{0:10.2f}, Y:{1:10.2f}, Z:{2:10.2f} uT\tTemp:{3:6.1f}*C".format(
-            mag_x, mag_y, mag_z, temp
-        )
-    )
+    print(f"X:{mag_x:10.2f}, Y:{mag_y:10.2f}, Z:{mag_z:10.2f} uT\tTemp:{temp:6.1f}*C")
     print("")
     time.sleep(1.0)
