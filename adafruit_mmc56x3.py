@@ -28,13 +28,15 @@ Implementation Notes
 """
 
 import time
-from micropython import const
+
 from adafruit_bus_device import i2c_device
-from adafruit_register.i2c_struct import ROUnaryStruct, UnaryStruct
 from adafruit_register.i2c_bit import RWBit
+from adafruit_register.i2c_struct import ROUnaryStruct, UnaryStruct
+from micropython import const
 
 try:
     from typing import Tuple
+
     from busio import I2C
 except ImportError:
     pass
