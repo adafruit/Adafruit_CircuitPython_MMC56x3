@@ -100,7 +100,7 @@ class MMC5603:
     def __init__(self, i2c_bus: I2C, address: int = _MMC5603_I2CADDR_DEFAULT) -> None:
         # pylint: disable=no-member
         self.i2c_device = i2c_device.I2CDevice(i2c_bus, address)
-        if self._chip_id != _MMC5603_CHIP_ID:
+        if self._chip_id not in (_MMC5603_CHIP_ID, 0x00):
             raise RuntimeError("Failed to find MMC5603 - check your wiring!")
 
         self.reset()
