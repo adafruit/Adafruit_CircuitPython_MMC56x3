@@ -40,8 +40,6 @@ board.DISPLAY.root_group = main_group
 while True:
     # update the text of the label(s) to show the sensor readings
     mag_x, mag_y, mag_z = sensor.magnetic
-    display_output_label.text = (
-        f"x: {mag_x:.1f} uT\ny: {mag_y:.1f} uT\nz: {mag_z:.1f} uT"
-    )
+    display_output_label.text = f"x: {mag_x:.1f}uT\ny: {mag_y:.1f} uT\nz: {mag_z:.1f} uT"
     # wait for a bit
     time.sleep(0.5)
