@@ -12,7 +12,7 @@ Continuous mode test
 Test using continuous mode.
 
 .. literalinclude:: ../examples/mmc56x3_continuous.py
-    :caption: examples/mmc56x3_continuoust.py
+    :caption: examples/mmc56x3_continuous.py
     :linenos:
 
 DisplayIO Simpletest
